@@ -65,6 +65,40 @@ pub fn get_state_by_state_id<'a>(id: u16) -> Option<&'a State> {
     get_block_and_state_by_state_id(id).map(|(_, state)| state)
 }
 
+pub fn get_state_by_properties<'a>(block_id: u16, properties: &Vec<String>) -> Option<&'a State> {
+    let block = get_block_by_id(block_id).unwrap();
+    let mut indexes = Vec::<u16>::new();
+    let mut coefficients = Vec::<u16>::new();
+
+    for (index, property) in block.properties.iter().enumerate().rev() {
+        match property.values.iter().position(|n| *n == properties[index]) {
+            Some(value_index) => {
+                indexes.push(value_index as u16);
+            }
+            None => continue,
+        }
+
+        if index == block.properties.len()-1 {
+            coefficients.push(1);
+        } else {
+            coefficients.push(
+                coefficients.last().unwrap_or(&(1 as u16))
+                    * (block.properties[index + 1].values.len() as u16),
+            );
+            
+        }
+    }
+
+    coefficients.reverse();
+    indexes.reverse();
+    let mut state_id = block.states[0].id;
+
+    for (index, coefficient) in coefficients.iter().enumerate() {
+        state_id += indexes[index] * coefficient;
+    }
+    get_state_by_state_id(state_id)
+}
+
 pub fn get_block_by_state_id<'a>(id: u16) -> Option<&'a Block> {
     let block_id = BLOCK_ID_BY_STATE_ID.get(&id)?;
     BLOCKS_BY_ID.get(block_id)
@@ -107,6 +141,7 @@ pub struct Property {
     name: String,
     values: Vec<String>,
 }
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct State {
     pub id: u16,

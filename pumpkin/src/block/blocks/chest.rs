@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use pumpkin_core::math::position::WorldPosition;
 use pumpkin_inventory::{Chest, OpenContainer, WindowType};
 use pumpkin_macros::{pumpkin_block, sound};
-use pumpkin_world::{block::block_registry::get_block, item::item_registry::Item};
+use pumpkin_world::{block::block_registry::{get_block, get_state_by_properties}, item::item_registry::Item};
 
 use crate::{
     block::{block_manager::BlockActionResult, pumpkin_block::PumpkinBlock},
@@ -21,6 +21,10 @@ impl PumpkinBlock for ChestBlock {
             .world()
             .play_block_sound(sound!("block.chest.open"), _location)
             .await;
+    }
+
+    async fn on_placed<'a>(&self, player: &Player, _location: WorldPosition, _server: &Server) {
+        player.world().set_block_state(_location, get_state_by_properties(185, &vec!["west".to_string(), "single".to_string(), "false".to_string()]).unwrap().id).await;
     }
 
     async fn on_use_with_item<'a>(
