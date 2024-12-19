@@ -52,40 +52,73 @@ pub static BLOCK_ID_BY_ITEM_ID: LazyLock<HashMap<u16, u16>> = LazyLock::new(|| {
     map
 });
 
+pub static PROPERTIES_BY_STATE_ID: LazyLock<Vec<Vec<StateProperty>>> = LazyLock::new(|| {
+    BLOCKS
+        .blocks
+        .iter()
+        .map(|block| {
+            block
+                .properties
+                .iter()
+                .flat_map(|property| {
+                    property.values.iter().map(|value| StateProperty {
+                        name: &property.name,
+                        value,
+                    })
+                })
+                .collect()
+        })
+        .collect::<Vec<Vec<StateProperty>>>()
+});
+
 pub fn get_block(registry_id: &str) -> Option<&Block> {
     let id = BLOCK_ID_BY_REGISTRY_ID.get(&registry_id.replace("minecraft:", ""))?;
     BLOCKS_BY_ID.get(id)
 }
 
-pub fn get_block_by_id<'a>(id: u16) -> Option<&'a Block> {
+pub fn get_block_by_id(id: u16) -> Option<&'static Block> {
     BLOCKS_BY_ID.get(&id)
 }
 
-pub fn get_state_by_state_id<'a>(id: u16) -> Option<&'a State> {
+pub fn get_state_by_state_id(id: u16) -> Option<&'static State> {
     get_block_and_state_by_state_id(id).map(|(_, state)| state)
 }
 
-pub fn get_state_by_properties<'a>(block_id: u16, properties: &Vec<String>) -> Option<&'a State> {
+pub fn get_state_by_properties(
+    block_id: u16,
+    properties: &HashMap<&str, &str>,
+) -> Option<&'static State> {
     let block = get_block_by_id(block_id).unwrap();
+
+    if properties.len() != block.properties.len() {
+        return None;
+    }
+
     let mut indexes = Vec::<u16>::new();
     let mut coefficients = Vec::<u16>::new();
 
     for (index, property) in block.properties.iter().enumerate().rev() {
-        match property.values.iter().position(|n| *n == properties[index]) {
-            Some(value_index) => {
-                indexes.push(value_index as u16);
+        match properties.get(property.name.as_str()) {
+            Some(value) => match property.values.iter().position(|n| n == value) {
+                Some(value_index) => {
+                    indexes.push(value_index as u16);
+                }
+                None => {
+                    return None;
+                }
+            },
+            _ => {
+                return None;
             }
-            None => continue,
         }
 
-        if index == block.properties.len()-1 {
+        if index == block.properties.len() - 1 {
             coefficients.push(1);
         } else {
             coefficients.push(
-                coefficients.last().unwrap_or(&(1 as u16))
+                coefficients.last().unwrap_or(&(1u16))
                     * (block.properties[index + 1].values.len() as u16),
             );
-            
         }
     }
 
@@ -99,12 +132,23 @@ pub fn get_state_by_properties<'a>(block_id: u16, properties: &Vec<String>) -> O
     get_state_by_state_id(state_id)
 }
 
-pub fn get_block_by_state_id<'a>(id: u16) -> Option<&'a Block> {
+pub fn get_properties_by_state_id(state_id: u16) -> Option<HashMap<&'static str, &'static str>> {
+    PROPERTIES_BY_STATE_ID.get(state_id as usize).map(|states| {
+        states
+            .into_iter()
+            .map(|state| (state.name, state.value))
+            .collect::<HashMap<_, _>>()
+    })
+}
+
+// current_properties = get_properties_by_state_id
+// current_properties.set("FACING", "NORTH")
+pub fn get_block_by_state_id(id: u16) -> Option<&'static Block> {
     let block_id = BLOCK_ID_BY_STATE_ID.get(&id)?;
     BLOCKS_BY_ID.get(block_id)
 }
 
-pub fn get_block_and_state_by_state_id<'a>(id: u16) -> Option<(&'a Block, &'a State)> {
+pub fn get_block_and_state_by_state_id(id: u16) -> Option<(&'static Block, &'static State)> {
     let block_id = BLOCK_ID_BY_STATE_ID.get(&id)?;
     let block = BLOCKS_BY_ID.get(block_id)?;
     let state_index = STATE_INDEX_BY_STATE_ID.get(&id)?;
@@ -112,7 +156,7 @@ pub fn get_block_and_state_by_state_id<'a>(id: u16) -> Option<(&'a Block, &'a St
     Some((block, state))
 }
 
-pub fn get_block_by_item<'a>(item_id: u16) -> Option<&'a Block> {
+pub fn get_block_by_item(item_id: u16) -> Option<&'static Block> {
     let block_id = BLOCK_ID_BY_ITEM_ID.get(&item_id)?;
     BLOCKS_BY_ID.get(block_id)
 }
@@ -140,6 +184,13 @@ pub struct Block {
 pub struct Property {
     name: String,
     values: Vec<String>,
+}
+
+#[expect(dead_code)]
+#[derive(Clone, Debug)]
+pub struct StateProperty {
+    pub name: &'static str,
+    pub value: &'static str,
 }
 
 #[derive(Deserialize, Clone, Debug)]
