@@ -238,14 +238,15 @@ impl LivingEntity {
                     .await;
             }
         } else if height_difference < 0.0 {
-            let mut new_fall_distance = 0f32;
+            let new_fall_distance = if !self.is_in_water().await && !self.is_in_powder_snow().await
+            {
+                let distance = self.fall_distance.load();
+                distance - (height_difference as f32)
+            } else {
+                0f32
+            };
 
             // Reset fall distance if is in water or powder_snow
-            if !self.is_in_water().await && !self.is_in_powder_snow().await {
-                let distance = self.fall_distance.load();
-                new_fall_distance = distance - (height_difference as f32);
-            }
-
             self.fall_distance.store(new_fall_distance);
         }
     }
