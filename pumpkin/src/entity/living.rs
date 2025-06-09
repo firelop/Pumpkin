@@ -243,7 +243,7 @@ impl LivingEntity {
             // Reset fall distance if is in water or powder_snow
             if !self.is_in_water().await && !self.is_in_powder_snow().await {
                 let distance = self.fall_distance.load();
-                new_fall_distance = distance - (height_difference as f32)
+                new_fall_distance = distance - (height_difference as f32);
             }
 
             self.fall_distance.store(new_fall_distance);
